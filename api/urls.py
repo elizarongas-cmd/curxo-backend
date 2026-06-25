@@ -16,7 +16,7 @@ router.register(r'mensajes', views.MensajeViewSet)
 urlpatterns = [
     # Auth endpoints
     path('auth/login/', views.CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/token/refresh/', views.refresh_token_view, name='token_refresh'),
     path('auth/registro/', views.registro_view, name='registro'),
     path('auth/google/', views.google_auth_view, name='google-auth'),
     path('auth/me/', views.me_view, name='me'),

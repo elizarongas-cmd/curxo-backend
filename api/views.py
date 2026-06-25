@@ -5,6 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Q
 from django.db import IntegrityError
+from django.http import JsonResponse
 from datetime import datetime, timedelta
 import uuid
 import hashlib
@@ -23,11 +24,50 @@ from .serializers import (
 )
 
 
+def set_token_cookies(response, refresh_token, access_token):
+    """Set JWT tokens as httpOnly cookies"""
+    response.set_cookie(
+        'access_token', access_token,
+        httponly=True, secure=False, samesite='Lax',
+        max_age=3600  # 1 hour
+    )
+    response.set_cookie(
+        'refresh_token', refresh_token,
+        httponly=True, secure=False, samesite='Lax',
+        max_age=7 * 24 * 3600  # 7 days
+    )
+    return response
+
+
+def clear_token_cookies(response):
+    """Clear JWT cookies"""
+    response.delete_cookie('access_token')
+    response.delete_cookie('refresh_token')
+    return response
+
+
 # ============ AUTH VIEWS ============
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    """Custom login view with user data and role"""
+    """Login: returns user data + sets httpOnly cookies"""
     serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.user
+        refresh = RefreshToken.for_user(user)
+
+        response = Response({
+            'user': {
+                'id': str(user.id),
+                'nombre': f"{user.first_name} {user.last_name}".strip() or user.username,
+                'email': user.email,
+                'rol': user.rol,
+                'avatar': user.avatar if user.avatar else None,
+            }
+        })
+        return set_token_cookies(response, str(refresh), str(refresh.access_token))
 
 
 @api_view(['POST'])
@@ -38,23 +78,22 @@ def registro_view(request):
     if serializer.is_valid():
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
-        return Response({
+        response = Response({
             'user': {
                 'id': str(user.id),
                 'nombre': f"{user.first_name} {user.last_name}".strip(),
                 'email': user.email,
                 'rol': user.rol,
-            },
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
+            }
         }, status=status.HTTP_201_CREATED)
+        return set_token_cookies(response, str(refresh), str(refresh.access_token))
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def me_view(request):
-    """Get current user data"""
+    """Get current user data - reads token from cookie or header"""
     user = request.user
     return Response({
         'id': str(user.id),
@@ -69,15 +108,17 @@ def me_view(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def logout_view(request):
-    """Logout (blacklist refresh token)"""
+    """Logout: blacklists refresh token + clears cookies"""
     try:
-        refresh_token = request.data.get('refresh')
+        refresh_token = request.COOKIES.get('refresh_token') or request.data.get('refresh')
         if refresh_token:
             token = RefreshToken(refresh_token)
             token.blacklist()
-        return Response({'mensaje': 'Sesión cerrada exitosamente'})
     except Exception:
-        return Response({'mensaje': 'Sesión cerrada'})
+        pass
+
+    response = Response({'mensaje': 'Sesión cerrada exitosamente'})
+    return clear_token_cookies(response)
 
 
 @api_view(['POST'])
@@ -117,17 +158,39 @@ def google_auth_view(request):
             )
 
     refresh = RefreshToken.for_user(user)
-    return Response({
+    response = Response({
         'user': {
             'id': str(user.id),
             'nombre': f"{user.first_name} {user.last_name}".strip() or user.username,
             'email': user.email,
             'rol': user.rol,
             'avatar': user.avatar,
-        },
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
+        }
     })
+    return set_token_cookies(response, str(refresh), str(refresh.access_token))
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def refresh_token_view(request):
+    """Refresh access token using refresh cookie"""
+    refresh_token = request.COOKIES.get('refresh_token')
+    if not refresh_token:
+        return Response({'detail': 'No refresh token'}, status=401)
+
+    try:
+        refresh = RefreshToken(refresh_token)
+        access_token = str(refresh.access_token)
+        response = Response({'access': access_token})
+        response.set_cookie(
+            'access_token', access_token,
+            httponly=True, secure=False, samesite='Lax',
+            max_age=3600
+        )
+        return response
+    except Exception:
+        response = Response({'detail': 'Token inválido'}, status=401)
+        return clear_token_cookies(response)
 
 
 # ============ CURSO VIEWS ============
