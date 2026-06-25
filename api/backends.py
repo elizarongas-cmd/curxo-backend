@@ -7,7 +7,6 @@ User = get_user_model()
 
 
 class EmailBackend(ModelBackend):
-    """Authenticate using email instead of username"""
     def authenticate(self, request, username=None, password=None, **kwargs):
         email = kwargs.get('email', username)
         if email is None:
@@ -22,17 +21,13 @@ class EmailBackend(ModelBackend):
 
 
 class CookieJWTAuthentication(JWTAuthentication):
-    """JWT authentication that reads tokens from httpOnly cookies"""
-
     def authenticate(self, request):
         header_result = super().authenticate(request)
         if header_result:
             return header_result
-
         access_token = request.COOKIES.get('access_token')
         if not access_token:
             return None
-
         try:
             validated_token = self.get_validated_token(access_token)
             return self.get_user(validated_token), validated_token

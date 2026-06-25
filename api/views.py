@@ -49,7 +49,7 @@ def clear_token_cookies(response):
 # ============ AUTH VIEWS ============
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    """Login: returns user data + sets httpOnly cookies"""
+    """Login: returns user + tokens (body) + sets httpOnly cookies (fallback)"""
     serializer_class = CustomTokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
@@ -65,7 +65,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 'email': user.email,
                 'rol': user.rol,
                 'avatar': user.avatar if user.avatar else None,
-            }
+            },
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
         })
         return set_token_cookies(response, str(refresh), str(refresh.access_token))
 
@@ -84,7 +86,9 @@ def registro_view(request):
                 'nombre': f"{user.first_name} {user.last_name}".strip(),
                 'email': user.email,
                 'rol': user.rol,
-            }
+            },
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
         }, status=status.HTTP_201_CREATED)
         return set_token_cookies(response, str(refresh), str(refresh.access_token))
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -165,7 +169,9 @@ def google_auth_view(request):
             'email': user.email,
             'rol': user.rol,
             'avatar': user.avatar,
-        }
+        },
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
     })
     return set_token_cookies(response, str(refresh), str(refresh.access_token))
 
