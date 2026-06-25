@@ -100,6 +100,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://academia-curxo-26-47c4e.web.app",
+    "https://web-production-b9874.up.railway.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
