@@ -40,16 +40,30 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
 class RegistroSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
+    nombre = serializers.CharField(write_only=True, required=False, source='first_name')
+    apellido = serializers.CharField(write_only=True, required=False, source='last_name')
     
     class Meta:
         model = Usuario
         fields = ['email', 'username', 'first_name', 'last_name', 
-                  'telefono', 'password']
+                  'nombre', 'apellido', 'telefono', 'password']
+        extra_kwargs = {
+            'username': {'required': False},
+            'first_name': {'required': False},
+            'last_name': {'required': False},
+        }
     
     def create(self, validated_data):
+        email = validated_data['email']
+        username = validated_data.get('username') or email.split('@')[0]
+        
+        if Usuario.objects.filter(username=username).exists():
+            import uuid
+            username = f"{username}_{str(uuid.uuid4())[:6]}"
+        
         user = Usuario.objects.create_user(
-            email=validated_data['email'],
-            username=validated_data['username'],
+            email=email,
+            username=username,
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             telefono=validated_data.get('telefono', ''),
