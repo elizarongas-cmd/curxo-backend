@@ -99,11 +99,8 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://academia-curxo-26-47c4e.web.app",
-]
+import json
+CORS_ALLOWED_ORIGINS = json.loads(os.environ.get('CORS_ALLOWED_ORIGINS', '["http://localhost:3000", "http://127.0.0.1:3000", "https://academia-curxo-26-47c4e.web.app"]'))
 CORS_ALLOW_CREDENTIALS = True
 
 # Authentication Backend (use email instead of username)
